@@ -16,6 +16,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import os.path
 import sys
 
@@ -49,24 +50,36 @@ def list_figures():
     for fig in conn.getObjects('FileAnnotation',
                                attributes={'ns': 'omero.web.figure.json'}):
         filename = fig.getFileName()
-        if 'zegami' not in filename:
+        if not filename.endswith('zegami3'):
             continue
         fig_metadata = filename.split('_')
         print('%i,%s,%s' % (fig.getId(), fig_metadata[0], fig_metadata[2]))
 
 
 def download_json(dir_path, metadata_fpath):
-    fig_ids = [int(line.split(',')[0]) for line in open(metadata_fpath, 'r')]
+    metadata = [line.split(',') for line in open(metadata_fpath, 'r')]
 
     conn = omero_connection()
     conn.SERVICE_OPTS.setOmeroGroup(-1)
-    for id in fig_ids:
+    for fig_metadata in metadata:
+        id = int(fig_metadata[0])
+        gene_name = fig_metadata[1]
         fig = conn.getObject('FileAnnotation', id)
         if fig is None:
             print("no object with id '%i'" % id)
+        fig_json = json.loads("".join(fig.getFileInChunks()))
+        ## The gene name is a 'title' of the figure.  The 'title' is a
+        ## figure panel whose image is one white pixel.  This image
+        ## has ID 283965.  Remove this whole panel for blindness.
+        panels = fig_json['panels']
+        for i in range(len(panels)):
+            if panels[i]['imageId'] == 283965:
+                panels.pop(i)
+                break
+        else:
+            raise RuntimeError('no title panel on figure id %d' % id)
         with open(os.path.join(dir_path, '%i.json' % id), 'w') as fh:
-            for chunk in fig.getFileInChunks():
-                fh.write(chunk)
+            json.dumps(fig_json, fh)
 
 
 def main(command, *args):
