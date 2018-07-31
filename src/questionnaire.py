@@ -96,7 +96,7 @@ class QuestionWindow(QtWidgets.QWidget):
         layout.addWidget(self.questionnaire)
         layout.addWidget(save_button)
         self.setLayout(layout)
-        print "list is ", self.img_fpaths
+        print("list is ", self.img_fpaths)
 
     def open_image(self):
         fig_file = self.img_fpaths[self.current_img]
