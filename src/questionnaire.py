@@ -101,8 +101,8 @@ class QuestionWindow(QtWidgets.QWidget):
     def open_image(self):
         fig_file = self.img_fpaths[self.current_img]
         args = ['xdg-open', fig_file]
-        status = subprocess.call(args, shell=False)
-        if status != 0:
+        self.viewer = subprocess.Popen(args, shell=False)
+        if not self.viewer.returncode is None:
             error_dialog = QtWidgets.QErrorMessage(parent=self)
             error_dialog.setModal(True)
             error_dialog.showMessage("failed to call %s" % args)
@@ -115,6 +115,7 @@ class QuestionWindow(QtWidgets.QWidget):
             raise RuntimeError('file already exists, do not overwrite results')
         with open(fpath, 'wb') as fh:
             pickle.dump(self.questionnaire.to_serializable(), fh)
+        self.viewer.terminate()
 
         self.next_image()
 
