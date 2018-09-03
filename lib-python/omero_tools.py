@@ -19,6 +19,8 @@
 import omero.gateway
 import omero.util.sessions
 
+project_gid = 1003
+
 def get_connection():
     store = omero.util.sessions.SessionsStore()
     if store.count() < 1:
