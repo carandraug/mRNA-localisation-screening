@@ -33,7 +33,7 @@
 
 import argparse
 import collections.abc
-import importlib
+import importlib.util
 import os.path
 import pickle
 import subprocess
