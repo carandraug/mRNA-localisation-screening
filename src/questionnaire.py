@@ -193,9 +193,12 @@ class QuestionWindow(QtWidgets.QWidget):
 
     def open_image(self):
         fig_file = self.img_fpaths[self.current_img]
+
+        # use these lines to open in Preview on Mac
         export_command = "open "+fig_file
         self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
 
+        # use these lines to open in Linux
         #args = ['xdg-open', fig_file]
         #self.viewer = subprocess.Popen(args, shell=False)
         if not self.viewer.returncode is None:
@@ -264,7 +267,7 @@ def main(argv):
     questions = read_questions(args.questions_fpath)
     validate_questions(questions)
 
-    # conditional statement to avoid opening images that have already been scored  
+    # conditional statement to avoid opening images that have already been scored
     img_fpaths = [x for x in args.img_fpaths if os.path.splitext(os.path.basename(x))[0]+".pickle" not in os.listdir(args.save_dir)]
 
     window = QuestionWindow(questions, args.save_dir, img_fpaths)
