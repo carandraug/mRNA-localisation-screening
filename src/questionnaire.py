@@ -33,7 +33,6 @@
 
 import argparse
 import collections.abc
-import importlib.util
 import os.path
 import pickle
 import subprocess
@@ -42,16 +41,15 @@ import typing
 
 from PyQt5 import QtWidgets
 
-
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
-    spec = importlib.util.spec_from_file_location('questions', filepath)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    contents = {}
     try:
-        questions = getattr(module, 'QUESTIONS', None)
-    except AttributeError:
+        exec(open(filepath).read(), contents)
+    except:
+        raise RuntimeError('could not read QUESTIONS file %s' % filepath)
+    if 'QUESTIONS' not in contents:
         raise ValueError('could not find QUESTIONS on file %s' % filepath)
-    return questions
+    return contents['QUESTIONS']
 
 
 def validate_questions(questions) -> None:
