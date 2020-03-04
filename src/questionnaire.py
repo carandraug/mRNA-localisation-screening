@@ -193,8 +193,11 @@ class QuestionWindow(QtWidgets.QWidget):
 
     def open_image(self):
         fig_file = self.img_fpaths[self.current_img]
-        args = ['xdg-open', fig_file]
-        self.viewer = subprocess.Popen(args, shell=False)
+        export_command = "open "+fig_file
+        self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+
+        #args = ['xdg-open', fig_file]
+        #self.viewer = subprocess.Popen(args, shell=False)
         if not self.viewer.returncode is None:
             error_dialog = QtWidgets.QErrorMessage(parent=self)
             error_dialog.setModal(True)
@@ -219,7 +222,9 @@ class QuestionWindow(QtWidgets.QWidget):
         # Close the image viewer to prevent situation where the users
         # ends up with more than one image to score open and
         # accidentally scores the wrong one.
-        self.viewer.terminate()
+        #self.viewer.terminate()
+        export_command = """osascript -e 'quit app "PREVIEW"'"""
+        subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         self.next_image()
 
     def next_image(self):
@@ -259,7 +264,10 @@ def main(argv):
     questions = read_questions(args.questions_fpath)
     validate_questions(questions)
 
-    window = QuestionWindow(questions, args.save_dir, args.img_fpaths)
+    # conditional statement to avoid opening images that have already been scored  
+    img_fpaths = [x for x in args.img_fpaths if os.path.splitext(os.path.basename(x))[0]+".pickle" not in os.listdir(args.save_dir)]
+
+    window = QuestionWindow(questions, args.save_dir, img_fpaths)
     window.show()
     sys.exit(app.exec_())
 
