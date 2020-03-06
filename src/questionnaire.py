@@ -39,7 +39,7 @@ import subprocess
 import sys
 import typing
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
     contents = {}
@@ -162,7 +162,7 @@ class Questionnaire(QtWidgets.QWidget):
             question.reset()
 
 
-class QuestionWindow(QtWidgets.QWidget):
+class QuestionWidget(QtWidgets.QWidget):
     def __init__(self, questions, save_dir, img_fpaths,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -229,6 +229,18 @@ class QuestionWindow(QtWidgets.QWidget):
             error_dialog.showMessage("This is the end.")
             error_dialog.exec_()
             QtWidgets.qApp.quit()
+
+class QuestionWindow(QtWidgets.QMainWindow):
+    def __init__(self, questions, save_dir, img_fpaths,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.widget = QuestionWidget(questions, save_dir, img_fpaths,
+                                     parent=self)
+
+        self.scroll_area = QtWidgets.QScrollArea(self)
+        self.scroll_area.setWidget(self.widget)
+        self.scroll_area.setAlignment(QtCore.Qt.AlignHCenter)
+        self.setCentralWidget(self.scroll_area)
 
 
 def parse_arguments(arguments):
