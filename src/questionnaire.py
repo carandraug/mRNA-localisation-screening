@@ -33,25 +33,24 @@
 
 import argparse
 import collections.abc
-import importlib.util
 import os.path
 import pickle
 import subprocess
 import sys
 import typing
 from PIL import Image
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
-    spec = importlib.util.spec_from_file_location('questions', filepath)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    contents = {}
     try:
-        questions = getattr(module, 'QUESTIONS', None)
-    except AttributeError:
+        exec(open(filepath).read(), contents)
+    except:
+        raise RuntimeError('could not read QUESTIONS file %s' % filepath)
+    if 'QUESTIONS' not in contents:
         raise ValueError('could not find QUESTIONS on file %s' % filepath)
-    return questions
+    return contents['QUESTIONS']
 
 
 def validate_questions(questions) -> None:
@@ -164,7 +163,7 @@ class Questionnaire(QtWidgets.QWidget):
             question.reset()
 
 
-class QuestionWindow(QtWidgets.QWidget):
+class QuestionWidget(QtWidgets.QWidget):
     def __init__(self, questions, save_dir, img_fpaths,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -200,7 +199,7 @@ class QuestionWindow(QtWidgets.QWidget):
         # use these lines to open in Preview on Mac
         #export_command = "open "+fig_file
         #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
-	
+
 	# use these lines to open with PIL
         im = Image.open(fig_file)
         self.viewer = im.show('image')
@@ -252,8 +251,20 @@ class QuestionWindow(QtWidgets.QWidget):
 	# open next image after saving the previous image
         fig_file = self.img_fpaths[self.current_img]
         im = Image.open(fig_file)
-        self.viewer = im.show('image')        
+        self.viewer = im.show('image')
 
+class QuestionWindow(QtWidgets.QMainWindow):
+    def __init__(self, questions, save_dir, img_fpaths,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.widget = QuestionWidget(questions, save_dir, img_fpaths,
+                                     parent=self)
+
+        self.scroll_area = QtWidgets.QScrollArea(self)
+        self.scroll_area.setWidget(self.widget)
+        self.scroll_area.setAlignment(QtCore.Qt.AlignHCenter)
+        self.setCentralWidget(self.scroll_area)
+        
 def parse_arguments(arguments):
     parser = argparse.ArgumentParser(prog='mRNA loc questionnaire')
     parser.add_argument('questions_fpath', action='store', type=str,
