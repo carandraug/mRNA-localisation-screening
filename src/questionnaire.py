@@ -39,7 +39,7 @@ import pickle
 import subprocess
 import sys
 import typing
-
+from PIL import Image
 from PyQt5 import QtWidgets
 
 
@@ -178,8 +178,11 @@ class QuestionWindow(QtWidgets.QWidget):
             raise RuntimeError('no images to question')
 
         open_button = QtWidgets.QPushButton('Open in Viewer', parent=self)
+        #open_button.setCheckable(True)
+        #open_button.toggle()
         open_button.clicked.connect(self.open_image)
-
+        #if open_button.isChecked():
+        #    self.open_image
         self.questionnaire = Questionnaire(questions, parent=self)
 
         save_button = QtWidgets.QPushButton('save and next', parent=self)
@@ -195,16 +198,22 @@ class QuestionWindow(QtWidgets.QWidget):
         fig_file = self.img_fpaths[self.current_img]
 
         # use these lines to open in Preview on Mac
-        export_command = "open "+fig_file
-        self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+        #export_command = "open "+fig_file
+        #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+	
+	# use these lines to open with PIL
+        im = Image.open(fig_file)
+        self.viewer = im.show('image')
 
         # use these lines to open in Linux
         #args = ['xdg-open', fig_file]
         #self.viewer = subprocess.Popen(args, shell=False)
-        if not self.viewer.returncode is None:
-            error_dialog = QtWidgets.QErrorMessage(parent=self)
-            error_dialog.setModal(True)
-            error_dialog.showMessage("failed to call %s" % args)
+
+        # removed this to enable PIL
+        #if not self.viewer.returncode is None:
+        #    error_dialog = QtWidgets.QErrorMessage(parent=self)
+        #    error_dialog.setModal(True)
+        #    error_dialog.showMessage("failed to call %s" % args)
 
     def save_and_next(self):
         fig_file = self.img_fpaths[self.current_img]
@@ -240,6 +249,10 @@ class QuestionWindow(QtWidgets.QWidget):
             error_dialog.exec_()
             QtWidgets.qApp.quit()
 
+	# open next image after saving the previous image
+        fig_file = self.img_fpaths[self.current_img]
+        im = Image.open(fig_file)
+        self.viewer = im.show('image')        
 
 def parse_arguments(arguments):
     parser = argparse.ArgumentParser(prog='mRNA loc questionnaire')
