@@ -177,11 +177,7 @@ class QuestionWidget(QtWidgets.QWidget):
             raise RuntimeError('no images to question')
 
         open_button = QtWidgets.QPushButton('Open in Viewer', parent=self)
-        #open_button.setCheckable(True)
-        #open_button.toggle()
         open_button.clicked.connect(self.open_image)
-        #if open_button.isChecked():
-        #    self.open_image
         self.questionnaire = Questionnaire(questions, parent=self)
 
         save_button = QtWidgets.QPushButton('save and next', parent=self)
@@ -200,7 +196,7 @@ class QuestionWidget(QtWidgets.QWidget):
         #export_command = "open "+fig_file
         #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
 
-	# use these lines to open with PIL
+	    # use these lines to open with PIL
         im = Image.open(fig_file)
         self.viewer = im.show('image')
 
@@ -264,7 +260,7 @@ class QuestionWindow(QtWidgets.QMainWindow):
         self.scroll_area.setWidget(self.widget)
         self.scroll_area.setAlignment(QtCore.Qt.AlignHCenter)
         self.setCentralWidget(self.scroll_area)
-        
+
 def parse_arguments(arguments):
     parser = argparse.ArgumentParser(prog='mRNA loc questionnaire')
     parser.add_argument('questions_fpath', action='store', type=str,
