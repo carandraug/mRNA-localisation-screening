@@ -16,7 +16,7 @@
 ##     make metadata
 ##     make figures
 ##
-##
+## python3 src/questionnaire.py src/questions.py answers/ figures/*.jpg 
 
 ## Default target is the first target, so have help here to prevent
 ## trigerring anything by accident.  I think there's no reasonable
