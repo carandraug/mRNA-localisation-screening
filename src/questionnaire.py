@@ -18,6 +18,8 @@
 
 ## SYNOPSIS
 ##   questionnaire QUESTIONS-FPATH SAVE-DIR [IMG-FPATHS ...]
+##      Run the following command from the src directory:
+##          >python3 questionnaire.py questions.py answers/ figures/*.jpg 
 ##
 ## FORMAT OF QUESTIONS FILE
 ##
@@ -33,14 +35,15 @@
 
 import argparse
 import collections.abc
+import os
 import os.path
 import pickle
 import subprocess
 import sys
 import typing
+import pandas as pd
 from PIL import Image
 from PyQt5 import QtCore, QtWidgets
-
 
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
     contents = {}
@@ -193,12 +196,14 @@ class QuestionWidget(QtWidgets.QWidget):
         fig_file = self.img_fpaths[self.current_img]
 
         # use these lines to open in Preview on Mac
-        #export_command = "open "+fig_file
+        export_command = "open "+fig_file
         #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+        subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)	
 
-	    # use these lines to open with PIL
-        im = Image.open(fig_file)
-        self.viewer = im.show('image')
+	# use these lines to open with PIL
+	# note- PIL renames the file heading, making it difficult to look up the ID in O.Figure
+        #im = Image.open(fig_file)
+        #self.viewer = im.show('image')
 
         # use these lines to open in Linux
         #args = ['xdg-open', fig_file]
@@ -233,6 +238,7 @@ class QuestionWidget(QtWidgets.QWidget):
         export_command = """osascript -e 'quit app "PREVIEW"'"""
         subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         self.next_image()
+        self.parse_pickles()
 
     def next_image(self):
         self.questionnaire.reset()
@@ -243,6 +249,29 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog.showMessage("This is the end.")
             error_dialog.exec_()
             QtWidgets.qApp.quit()
+            
+    def parse_pickles(self):        
+        infiles = os.listdir(self.save_dir)
+        figure_list = []
+        d = {}
+
+        for file in infiles:
+            if file.endswith('.pickle'):
+                figure_list.append(file[:-7])
+
+        for figure in figure_list:
+            thisfile = os.path.join(self.save_dir, str(figure)+'.pickle')
+            try:
+                with open(thisfile, 'rb') as f:
+                    p = pickle.load(f)
+                    #some modifications to deal with the new pickle format
+                    col_names = [x[0] for x in p]
+                    d[figure] = [x[1] for x in p]
+            except:
+                pass
+
+        df = pd.DataFrame.from_dict(d, orient = 'index', columns = col_names)
+        df.to_csv(os.path.join(self.save_dir, 'questionnaire_results.csv'))
 
 	# open next image after saving the previous image
         fig_file = self.img_fpaths[self.current_img]
@@ -278,7 +307,6 @@ def parse_arguments(arguments):
         if not os.path.isfile(img_fpath):
             raise ValueError('no img file \'%s\'' % img_fpath)
     return args
-
 
 def main(argv):
     app = QtWidgets.QApplication(argv)
