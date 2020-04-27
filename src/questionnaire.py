@@ -43,7 +43,10 @@ import sys
 import typing
 import pandas as pd
 from PIL import Image
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QMessageBox, QFileDialog
+
+
 
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
     contents = {}
@@ -185,25 +188,29 @@ class QuestionWidget(QtWidgets.QWidget):
 
         save_button = QtWidgets.QPushButton('save and next', parent=self)
         save_button.clicked.connect(self.save_and_next)
-
+        
+        back_button = QtWidgets.QPushButton('previous image', parent=self)
+        back_button.clicked.connect(self.prev_image)
+        
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(open_button)
         layout.addWidget(self.questionnaire)
         layout.addWidget(save_button)
+        layout.addWidget(back_button)
         self.setLayout(layout)
 
     def open_image(self):
         fig_file = self.img_fpaths[self.current_img]
 
         # use these lines to open in Preview on Mac
-        export_command = "open "+fig_file
+        #export_command = "open "+fig_file
         #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
-        subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)	
-
-	# use these lines to open with PIL
-	# note- PIL renames the file heading, making it difficult to look up the ID in O.Figure
-        #im = Image.open(fig_file)
-        #self.viewer = im.show('image')
+        #subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)	
+        print ('current_img is', self.current_img)
+        # use these lines to open with PIL
+        # note- PIL renames the file heading, making it difficult to look up the ID in O.Figure
+        im = Image.open(fig_file)
+        self.viewer = im.show('image')
 
         # use these lines to open in Linux
         #args = ['xdg-open', fig_file]
@@ -220,14 +227,47 @@ class QuestionWidget(QtWidgets.QWidget):
         fname = os.path.splitext(os.path.basename(fig_file))[0]
         fpath = os.path.join(self.save_dir, fname + '.pickle')
         if os.path.exists(fpath):
-            error_dialog = QtWidgets.QErrorMessage(parent=self)
-            error_dialog.setModal(True)
-            error_dialog.showMessage('A file named \'%s\' for this image'
-                                     ' answers already exists.  Doing nothing'
-                                     ' until that is resolved' % fpath)
-            error_dialog.exec_();
+            #error_dialog = QtWidgets.QErrorMessage(parent=self)
+            #error_dialog.setModal(True)
+            #error_dialog.showMessage('A file named \'%s\' for this image'
+            #                         ' answers already exists.  Doing nothing'
+            #                         ' until that is resolved' % fpath)
+            #error_dialog.exec_();
+            
+            #error_dialog = QMessageBox.question(self, 'PyQt5 message', "A file with this name already exists.", 
+            #                                    QMessageBox.Cancel |                                                 
+            #                                    QMessageBox.Save | 
+            #                                    QMessageBox.addButton("Overwrite", QMessageBox.YesRole ))
+            
+            error_dialog = QMessageBox()
+            error_dialog.setIcon(QMessageBox.Warning)
+            error_dialog.setText('File already exists. Do you want to replace it?')
+            error_dialog.setStandardButtons(QMessageBox.Cancel)
+            #error_dialog.addButton('Cancel', QMessageBox.DestructiveRole)
+            replace_button = error_dialog.addButton('Replace', QMessageBox.YesRole)
+            replace_button.clicked.connect(self.write_files)
+            #error_dialog.buttonClicked.connect('replace')
+            
+            #error_dialog = QMessageBox()
+            #error_dialog.setText('A file with this name already exists.')
+            #error_dialog.addButton('Cancel', error_dialog.RejectRole)
+            #error_dialog.addButton('SaveAs', error_dialog.YesRole)
+            #error_dialog.addButton('Overwrite', error_dialog.YesRole)
+            ret = error_dialog.exec_()
+            #if ret == save:
+            #    print ("save button")
+            #if ret == error_dialog.Cancel:
+            #    print('Cancel clicked.')
+            #error_dialog.exec_();
             return
-
+        
+        self.write_files()
+        
+    
+    def write_files(self):
+        fig_file = self.img_fpaths[self.current_img]
+        fname = os.path.splitext(os.path.basename(fig_file))[0]
+        fpath = os.path.join(self.save_dir, fname + '.pickle')
         with open(fpath, 'wb') as fh:
             pickle.dump(self.questionnaire.to_serializable(), fh)
 
@@ -239,7 +279,7 @@ class QuestionWidget(QtWidgets.QWidget):
         subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         self.next_image()
         self.parse_pickles()
-
+        
     def next_image(self):
         self.questionnaire.reset()
         self.current_img +=1
@@ -249,7 +289,25 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog.showMessage("This is the end.")
             error_dialog.exec_()
             QtWidgets.qApp.quit()
-            
+
+    def prev_image(self):
+        self.questionnaire.reset()
+        self.current_img -=1
+        if not self.current_img < len(self.img_fpaths):
+            error_dialog = QtWidgets.QErrorMessage(parent=self)
+            error_dialog.setModal(True)
+            error_dialog.showMessage("This is the end.")
+            error_dialog.exec_()
+            QtWidgets.qApp.quit()
+        
+        # Close the image viewer to prevent situation where the users
+        # ends up with more than one image to score open and
+        # accidentally scores the wrong one.
+        #self.viewer.terminate()
+        export_command = """osascript -e 'quit app "PREVIEW"'"""
+        subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+        self.open_image()
+        
     def parse_pickles(self):        
         infiles = os.listdir(self.save_dir)
         figure_list = []
@@ -273,7 +331,7 @@ class QuestionWidget(QtWidgets.QWidget):
         df = pd.DataFrame.from_dict(d, orient = 'index', columns = col_names)
         df.to_csv(os.path.join(self.save_dir, 'questionnaire_results.csv'))
 
-	# open next image after saving the previous image
+        # open next image after saving the previous image
         fig_file = self.img_fpaths[self.current_img]
         im = Image.open(fig_file)
         self.viewer = im.show('image')
