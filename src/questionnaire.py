@@ -206,9 +206,8 @@ class QuestionWidget(QtWidgets.QWidget):
         #export_command = "open "+fig_file
         #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         #subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)	
-        print ('current_img is', self.current_img)
+        
         # use these lines to open with PIL
-        # note- PIL renames the file heading, making it difficult to look up the ID in O.Figure
         im = Image.open(fig_file)
         self.viewer = im.show('image')
 
@@ -234,35 +233,16 @@ class QuestionWidget(QtWidgets.QWidget):
             #                         ' until that is resolved' % fpath)
             #error_dialog.exec_();
             
-            #error_dialog = QMessageBox.question(self, 'PyQt5 message', "A file with this name already exists.", 
-            #                                    QMessageBox.Cancel |                                                 
-            #                                    QMessageBox.Save | 
-            #                                    QMessageBox.addButton("Overwrite", QMessageBox.YesRole ))
-            
-            error_dialog = QMessageBox()
-            error_dialog.setIcon(QMessageBox.Warning)
-            error_dialog.setText('File already exists. Do you want to replace it?')
-            error_dialog.setStandardButtons(QMessageBox.Cancel)
-            #error_dialog.addButton('Cancel', QMessageBox.DestructiveRole)
-            replace_button = error_dialog.addButton('Replace', QMessageBox.YesRole)
+            warning_dialog = QMessageBox()
+            warning_dialog.setIcon(QMessageBox.Warning)
+            warning_dialog.setText('File already exists. Do you want to replace it?')
+            warning_dialog.setStandardButtons(QMessageBox.Cancel)
+            replace_button = warning_dialog.addButton('Replace', QMessageBox.YesRole)
             replace_button.clicked.connect(self.write_files)
-            #error_dialog.buttonClicked.connect('replace')
-            
-            #error_dialog = QMessageBox()
-            #error_dialog.setText('A file with this name already exists.')
-            #error_dialog.addButton('Cancel', error_dialog.RejectRole)
-            #error_dialog.addButton('SaveAs', error_dialog.YesRole)
-            #error_dialog.addButton('Overwrite', error_dialog.YesRole)
-            ret = error_dialog.exec_()
-            #if ret == save:
-            #    print ("save button")
-            #if ret == error_dialog.Cancel:
-            #    print('Cancel clicked.')
-            #error_dialog.exec_();
+            warning_dialog.exec_()
             return
         
         self.write_files()
-        
     
     def write_files(self):
         fig_file = self.img_fpaths[self.current_img]
