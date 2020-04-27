@@ -18,6 +18,8 @@
 
 ## SYNOPSIS
 ##   questionnaire QUESTIONS-FPATH SAVE-DIR [IMG-FPATHS ...]
+##      Run the following command from the src directory:
+##          >python3 questionnaire.py questions.py answers/ figures/*.jpg 
 ##
 ## FORMAT OF QUESTIONS FILE
 ##
@@ -33,13 +35,18 @@
 
 import argparse
 import collections.abc
+import os
 import os.path
 import pickle
 import subprocess
 import sys
 import typing
+import pandas as pd
+from PIL import Image
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QMessageBox, QFileDialog
 
-from PyQt5 import QtCore, QtWidgets
+
 
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
     contents = {}
@@ -177,49 +184,82 @@ class QuestionWidget(QtWidgets.QWidget):
 
         open_button = QtWidgets.QPushButton('Open in Viewer', parent=self)
         open_button.clicked.connect(self.open_image)
-
         self.questionnaire = Questionnaire(questions, parent=self)
 
         save_button = QtWidgets.QPushButton('save and next', parent=self)
         save_button.clicked.connect(self.save_and_next)
-
+        
+        back_button = QtWidgets.QPushButton('previous image', parent=self)
+        back_button.clicked.connect(self.prev_image)
+        
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(open_button)
         layout.addWidget(self.questionnaire)
         layout.addWidget(save_button)
+        layout.addWidget(back_button)
         self.setLayout(layout)
 
     def open_image(self):
         fig_file = self.img_fpaths[self.current_img]
-        args = ['xdg-open', fig_file]
-        self.viewer = subprocess.Popen(args, shell=False)
-        if not self.viewer.returncode is None:
-            error_dialog = QtWidgets.QErrorMessage(parent=self)
-            error_dialog.setModal(True)
-            error_dialog.showMessage("failed to call %s" % args)
+
+        # use these lines to open in Preview on Mac
+        #export_command = "open "+fig_file
+        #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+        #subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)	
+        
+        # use these lines to open with PIL
+        im = Image.open(fig_file)
+        self.viewer = im.show('image')
+
+        # use these lines to open in Linux
+        #args = ['xdg-open', fig_file]
+        #self.viewer = subprocess.Popen(args, shell=False)
+
+        # removed this to enable PIL
+        #if not self.viewer.returncode is None:
+        #    error_dialog = QtWidgets.QErrorMessage(parent=self)
+        #    error_dialog.setModal(True)
+        #    error_dialog.showMessage("failed to call %s" % args)
 
     def save_and_next(self):
         fig_file = self.img_fpaths[self.current_img]
         fname = os.path.splitext(os.path.basename(fig_file))[0]
         fpath = os.path.join(self.save_dir, fname + '.pickle')
         if os.path.exists(fpath):
-            error_dialog = QtWidgets.QErrorMessage(parent=self)
-            error_dialog.setModal(True)
-            error_dialog.showMessage('A file named \'%s\' for this image'
-                                     ' answers already exists.  Doing nothing'
-                                     ' until that is resolved' % fpath)
-            error_dialog.exec_();
+            #error_dialog = QtWidgets.QErrorMessage(parent=self)
+            #error_dialog.setModal(True)
+            #error_dialog.showMessage('A file named \'%s\' for this image'
+            #                         ' answers already exists.  Doing nothing'
+            #                         ' until that is resolved' % fpath)
+            #error_dialog.exec_();
+            
+            warning_dialog = QMessageBox()
+            warning_dialog.setIcon(QMessageBox.Warning)
+            warning_dialog.setText('File already exists. Do you want to replace it?')
+            warning_dialog.setStandardButtons(QMessageBox.Cancel)
+            replace_button = warning_dialog.addButton('Replace', QMessageBox.YesRole)
+            replace_button.clicked.connect(self.write_files)
+            warning_dialog.exec_()
             return
-
+        
+        self.write_files()
+    
+    def write_files(self):
+        fig_file = self.img_fpaths[self.current_img]
+        fname = os.path.splitext(os.path.basename(fig_file))[0]
+        fpath = os.path.join(self.save_dir, fname + '.pickle')
         with open(fpath, 'wb') as fh:
             pickle.dump(self.questionnaire.to_serializable(), fh)
 
         # Close the image viewer to prevent situation where the users
         # ends up with more than one image to score open and
         # accidentally scores the wrong one.
-        self.viewer.terminate()
+        #self.viewer.terminate()
+        export_command = """osascript -e 'quit app "PREVIEW"'"""
+        subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         self.next_image()
-
+        self.parse_pickles()
+        
     def next_image(self):
         self.questionnaire.reset()
         self.current_img +=1
@@ -229,6 +269,52 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog.showMessage("This is the end.")
             error_dialog.exec_()
             QtWidgets.qApp.quit()
+
+    def prev_image(self):
+        self.questionnaire.reset()
+        self.current_img -=1
+        if not self.current_img < len(self.img_fpaths):
+            error_dialog = QtWidgets.QErrorMessage(parent=self)
+            error_dialog.setModal(True)
+            error_dialog.showMessage("This is the end.")
+            error_dialog.exec_()
+            QtWidgets.qApp.quit()
+        
+        # Close the image viewer to prevent situation where the users
+        # ends up with more than one image to score open and
+        # accidentally scores the wrong one.
+        #self.viewer.terminate()
+        export_command = """osascript -e 'quit app "PREVIEW"'"""
+        subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+        self.open_image()
+        
+    def parse_pickles(self):        
+        infiles = os.listdir(self.save_dir)
+        figure_list = []
+        d = {}
+
+        for file in infiles:
+            if file.endswith('.pickle'):
+                figure_list.append(file[:-7])
+
+        for figure in figure_list:
+            thisfile = os.path.join(self.save_dir, str(figure)+'.pickle')
+            try:
+                with open(thisfile, 'rb') as f:
+                    p = pickle.load(f)
+                    #some modifications to deal with the new pickle format
+                    col_names = [x[0] for x in p]
+                    d[figure] = [x[1] for x in p]
+            except:
+                pass
+
+        df = pd.DataFrame.from_dict(d, orient = 'index', columns = col_names)
+        df.to_csv(os.path.join(self.save_dir, 'questionnaire_results.csv'))
+
+        # open next image after saving the previous image
+        fig_file = self.img_fpaths[self.current_img]
+        im = Image.open(fig_file)
+        self.viewer = im.show('image')
 
 class QuestionWindow(QtWidgets.QMainWindow):
     def __init__(self, questions, save_dir, img_fpaths,
@@ -241,7 +327,6 @@ class QuestionWindow(QtWidgets.QMainWindow):
         self.scroll_area.setWidget(self.widget)
         self.scroll_area.setAlignment(QtCore.Qt.AlignHCenter)
         self.setCentralWidget(self.scroll_area)
-
 
 def parse_arguments(arguments):
     parser = argparse.ArgumentParser(prog='mRNA loc questionnaire')
@@ -261,7 +346,6 @@ def parse_arguments(arguments):
             raise ValueError('no img file \'%s\'' % img_fpath)
     return args
 
-
 def main(argv):
     app = QtWidgets.QApplication(argv)
 
@@ -269,7 +353,10 @@ def main(argv):
     questions = read_questions(args.questions_fpath)
     validate_questions(questions)
 
-    window = QuestionWindow(questions, args.save_dir, args.img_fpaths)
+    # conditional statement to avoid opening images that have already been scored
+    img_fpaths = [x for x in args.img_fpaths if os.path.splitext(os.path.basename(x))[0]+".pickle" not in os.listdir(args.save_dir)]
+
+    window = QuestionWindow(questions, args.save_dir, img_fpaths)
     window.show()
     sys.exit(app.exec_())
 

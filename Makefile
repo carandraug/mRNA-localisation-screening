@@ -15,8 +15,9 @@
 ##     make login
 ##     make metadata
 ##     make figures
-##
-##
+##     
+## Run the following command from the src directory (need conda activate -py38 for pil):
+##     > python3 questionnaire.py questions.py answers/ figures/*.jpg 
 
 ## Default target is the first target, so have help here to prevent
 ## trigerring anything by accident.  I think there's no reasonable
