@@ -22,14 +22,29 @@
 ## FORMAT OF QUESTIONS FILE
 ##
 ##   The questions file is a python file with a QUESTIONS variable.
-##   This QUESTIONS variable must be a list, of tuples with two
-##   elements.  Each tuple defines an individual question.
+##   This QUESTIONS variable must be a list of objects subclassing
+##   QuestionWidget (see source code).  There are CheckQuestion,
+##   RadioQuestion, and TextQuestion:
 ##
-##   The first element in the question tuple must be a string and is
-##   the text for the actual question.  The second element in the
-##   tuple specifies the answer type and its initial value: if it is a
-##   string then the answer is a text box; if it is a tuple of strings
-##   then it is a group of radio buttons.
+##       CheckQuestion provides a question with multiple answers with
+##           the choice of selecting multiple ones.
+##
+##       RadioQuestion provides a question with multiple answers with
+##           the possibility of selecting only one.
+##
+##       TextQuestion provides a question and a box to type any
+##           answer.
+##
+##   For example:
+##
+##       QUESTIONS = [
+##           RadioQuestion('Level of expression',
+##                         ('none', 'low', 'high')),
+##           TextQuestion('What is the problem on this image?',
+##                        'This is the initial answer text'),
+##           CheckQuestion('How is the distribution?',
+##                         ('Punctate', 'Diffuse', 'Nuclear')),
+##       ]
 
 import argparse
 import collections.abc
@@ -40,33 +55,6 @@ import sys
 import typing
 
 from PyQt5 import QtCore, QtWidgets
-
-def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
-    contents = {}
-    try:
-        exec(open(filepath).read(), contents)
-    except:
-        raise RuntimeError('could not read QUESTIONS file %s' % filepath)
-    if 'QUESTIONS' not in contents:
-        raise ValueError('could not find QUESTIONS on file %s' % filepath)
-    return contents['QUESTIONS']
-
-
-def validate_questions(questions) -> None:
-    if not isinstance(questions, collections.abc.Sequence):
-        raise ValueError('QUESTIONS must be a sequence')
-    for question in questions:
-        if not isinstance(question, tuple) and len(question) != 2:
-            raise ValueError('each QUESTIONS element must be a tuple of 2')
-        question_text = question[0]
-        answer_spec = question[1]
-        if not isinstance(question_text, str):
-            raise ValueError('question text must be a str')
-        if not isinstance(answer_spec, (str, tuple)):
-            raise ValueError('answers for a question must be a str or tuple')
-        if (isinstance(answer_spec, tuple)
-            and not all([isinstance(x, str) for x in answer_spec])):
-            raise ValueError('if answer is a tuple, all elements must be str')
 
 
 class QuestionWidget(QtWidgets.QWidget):
@@ -81,7 +69,7 @@ class QuestionWidget(QtWidgets.QWidget):
     def reset(self) -> None:
         raise NotImplementedError()
 
-class SelectQuestion(QuestionWidget):
+class RadioQuestion(QuestionWidget):
     """QuestionWidget for group of radio buttons."""
     def __init__(self, question: str, options: typing.Sequence[str],
                  *args, **kwargs) -> None:
@@ -113,6 +101,37 @@ class SelectQuestion(QuestionWidget):
     def reset(self) -> None:
         self._answer.buttons()[0].setChecked(True)
 
+
+class CheckQuestion(QuestionWidget):
+    """QuestionWidget for group of check boxes."""
+    def __init__(self, question: str, options: typing.Sequence[str],
+                 *args, **kwargs) -> None:
+        super().__init__(question, *args, **kwargs)
+        self._answer = QtWidgets.QButtonGroup(parent=self)
+        self._answer.setExclusive(False)
+
+        for i, option in enumerate(options):
+            button = QtWidgets.QCheckBox(text=option, parent=self)
+            self._answer.addButton(button)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self._question)
+        button_box = QtWidgets.QHBoxLayout()
+        for button in self._answer.buttons():
+            button_box.addWidget(button)
+        button_box.addStretch() # left align buttons
+        layout.addLayout(button_box)
+        self.setLayout(layout)
+
+    def to_serializable(self) -> typing.Tuple[str, str]:
+        answers = [b.text() for b in self._answer.buttons() if b.isChecked()]
+        return (self._question.text(), '\t'.join(answers))
+
+    def reset(self) -> None:
+        for button in self._answer.buttons():
+            button.setChecked(False)
+
+
 class TextQuestion(QuestionWidget):
     """QuestionWidget for text box."""
     def __init__(self, question: str, start_text: str = '',
@@ -137,17 +156,7 @@ class TextQuestion(QuestionWidget):
 class Questionnaire(QtWidgets.QWidget):
     def __init__(self, questions, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        self._questions = []
-        for (question, answer_spec) in questions:
-            if isinstance(answer_spec, tuple):
-                question_widget = SelectQuestion
-            elif isinstance(answer_spec, str):
-                question_widget = TextQuestion
-            else:
-                raise ValueError('don\'t know what to do with answer %s'
-                                 % str(answer_spec))
-            self._questions.append(question_widget(question, answer_spec))
+        self._questions = questions
 
         layout = QtWidgets.QVBoxLayout()
         for question in self._questions:
@@ -230,6 +239,7 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog.exec_()
             QtWidgets.qApp.quit()
 
+
 class QuestionWindow(QtWidgets.QMainWindow):
     def __init__(self, questions, save_dir, img_fpaths,
                  *args, **kwargs):
@@ -241,6 +251,30 @@ class QuestionWindow(QtWidgets.QMainWindow):
         self.scroll_area.setWidget(self.widget)
         self.scroll_area.setAlignment(QtCore.Qt.AlignHCenter)
         self.setCentralWidget(self.scroll_area)
+
+
+def validate_questions(questions) -> None:
+    if not isinstance(questions, collections.abc.Sequence):
+        raise ValueError('QUESTIONS must be a sequence')
+    if any([isinstance(q, QuestionWidget) for q in questions]):
+        raise ValueError('Questions must be a sequence of QuestionWidgets')
+
+
+def read_questions(filepath: str) -> typing.Sequence[QuestionWidget]:
+    contents = {
+        'CheckQuestion' : CheckQuestion,
+        'RadioQuestion' : RadioQuestion,
+        'TextQuestion' : TextQuestion,
+    }
+    try:
+        exec(open(filepath).read(), contents)
+    except:
+        raise RuntimeError('could not read QUESTIONS file %s' % filepath)
+    if 'QUESTIONS' not in contents:
+        raise ValueError('could not find QUESTIONS on file %s' % filepath)
+    questions = contents['QUESTIONS']
+    validate_questions(questions)
+    return questions
 
 
 def parse_arguments(arguments):
@@ -267,7 +301,6 @@ def main(argv):
 
     args = parse_arguments(app.arguments())
     questions = read_questions(args.questions_fpath)
-    validate_questions(questions)
 
     window = QuestionWindow(questions, args.save_dir, args.img_fpaths)
     window.show()
