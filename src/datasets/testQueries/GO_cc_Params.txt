@@ -1,0 +1,5 @@
+QUERY_NAME	GO cellular component
+QUERY_TYPE	Gene
+CONSTRAINT1	organism.name=Drosophila melanogaster
+CONSTRAINT2	goAnnotation.ontologyTerm.namespace=cellular_component
+WRITE	goAnnotation.ontologyTerm.name

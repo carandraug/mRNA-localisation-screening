@@ -1,0 +1,6 @@
+QUERY_NAME	neural RNAi phenotype
+QUERY_TYPE	Gene
+CONSTRAINT1	organism.name=Drosophila melanogaster
+CONSTRAINT2	rnaiResults.rnaiScreen.name=Self-renewal and differentiation in neural stem cells
+FILTER1	rnaiResults.phenotype=neuroblast underproliferation,neuroblast overproliferation,ganglion mother cell shorter lineages,ganglion mother cell longer lineages,neuroblasts smaller,neuroblasts larger
+WRITE	rnaiResults.phenotype

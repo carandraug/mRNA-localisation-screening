@@ -1,0 +1,5 @@
+QUERY_NAME	3prime UTR length
+QUERY_TYPE	Gene
+CONSTRAINT1	UTRs	ThreePrimeUTR
+CONSTRAINT2	organism.name=Drosophila melanogaster
+WRITE	UTRs.length

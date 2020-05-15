@@ -1,0 +1,5 @@
+QUERY_NAME	GO biological process
+QUERY_TYPE	Gene
+CONSTRAINT1	organism.name=Drosophila melanogaster
+CONSTRAINT2	goAnnotation.ontologyTerm.namespace=biological_process
+WRITE	goAnnotation.ontologyTerm.name

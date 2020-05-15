@@ -1,0 +1,5 @@
+QUERY_NAME	GO molecular function
+QUERY_TYPE	Gene
+CONSTRAINT1	organism.name=Drosophila melanogaster
+CONSTRAINT2	goAnnotation.ontologyTerm.namespace=molecular_function
+WRITE	goAnnotation.ontologyTerm.name

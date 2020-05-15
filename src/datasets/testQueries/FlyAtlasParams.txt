@@ -1,0 +1,6 @@
+QUERY_NAME	FlyAtlas expression
+QUERY_TYPE	Gene
+CONSTRAINT1	microArrayResults	FlyAtlasResult
+CONSTRAINT2	organism.name=Drosophila melanogaster
+CONSTRAINT3	microArrayResults.affyCall=Up
+WRITE	microArrayResults.tissue.name

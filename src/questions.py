@@ -15,4 +15,4 @@
 ##   string then the answer is a text box; if it is a tuple of strings
 ##   then it is a group of radio buttons.
 
-QUESTIONS = [('RNA expressed?', ('no', 'progeny', 'NB', 'both')), ('Protein expressed?', ('no', 'progeny', 'NB', 'both')), ('Punctate?', ('no', 'yes')), ('Comments', '')]
+QUESTIONS = [('Is RNA in neuropil?', ('no', 'yes')), ('Is protein in neuropil?', ('no', 'yes')), ('Comments', '')]

@@ -1,0 +1,5 @@
+QUERY_NAME	L3 CNS
+QUERY_TYPE	Gene
+CONSTRAINT1	organism.name=Drosophila melanogaster
+CONSTRAINT2	rnaSeqResults.stage=L3 CNS
+WRITE	rnaSeqResults.expressionScore

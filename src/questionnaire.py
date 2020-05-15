@@ -19,7 +19,7 @@
 ## SYNOPSIS
 ##   questionnaire QUESTIONS-FPATH SAVE-DIR [IMG-FPATHS ...]
 ##      Run the following command from the src directory:
-##          >python3 questionnaire.py questions.py answers/ figures/*.jpg 
+##          >python3 questionnaire.py questions.py answers/ figures/*.jpg
 ##
 ## FORMAT OF QUESTIONS FILE
 ##
@@ -33,6 +33,7 @@
 ##   string then the answer is a text box; if it is a tuple of strings
 ##   then it is a group of radio buttons.
 
+import buildZegamiDatabase
 import argparse
 import collections.abc
 import os
@@ -188,10 +189,10 @@ class QuestionWidget(QtWidgets.QWidget):
 
         save_button = QtWidgets.QPushButton('save and next', parent=self)
         save_button.clicked.connect(self.save_and_next)
-        
+
         back_button = QtWidgets.QPushButton('previous image', parent=self)
         back_button.clicked.connect(self.prev_image)
-        
+
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(open_button)
         layout.addWidget(self.questionnaire)
@@ -205,8 +206,8 @@ class QuestionWidget(QtWidgets.QWidget):
         # use these lines to open in Preview on Mac
         #export_command = "open "+fig_file
         #self.viewer = subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
-        #subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)	
-        
+        #subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
+
         # use these lines to open with PIL
         im = Image.open(fig_file)
         self.viewer = im.show('image')
@@ -232,7 +233,7 @@ class QuestionWidget(QtWidgets.QWidget):
             #                         ' answers already exists.  Doing nothing'
             #                         ' until that is resolved' % fpath)
             #error_dialog.exec_();
-            
+
             warning_dialog = QMessageBox()
             warning_dialog.setIcon(QMessageBox.Warning)
             warning_dialog.setText('File already exists. Do you want to replace it?')
@@ -241,9 +242,9 @@ class QuestionWidget(QtWidgets.QWidget):
             replace_button.clicked.connect(self.write_files)
             warning_dialog.exec_()
             return
-        
+
         self.write_files()
-    
+
     def write_files(self):
         fig_file = self.img_fpaths[self.current_img]
         fname = os.path.splitext(os.path.basename(fig_file))[0]
@@ -259,14 +260,15 @@ class QuestionWidget(QtWidgets.QWidget):
         subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         self.next_image()
         self.parse_pickles()
-        
+
     def next_image(self):
         self.questionnaire.reset()
         self.current_img +=1
         if not self.current_img < len(self.img_fpaths):
             error_dialog = QtWidgets.QErrorMessage(parent=self)
             error_dialog.setModal(True)
-            error_dialog.showMessage("This is the end.")
+            error_dialog.showMessage("This is the end. Building database.")
+            buildZegamiDatabase.buildZegamiDatabase()
             error_dialog.exec_()
             QtWidgets.qApp.quit()
 
@@ -279,7 +281,7 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog.showMessage("This is the end.")
             error_dialog.exec_()
             QtWidgets.qApp.quit()
-        
+
         # Close the image viewer to prevent situation where the users
         # ends up with more than one image to score open and
         # accidentally scores the wrong one.
@@ -287,8 +289,8 @@ class QuestionWidget(QtWidgets.QWidget):
         export_command = """osascript -e 'quit app "PREVIEW"'"""
         subprocess.Popen(export_command, shell=True, stdout=subprocess.PIPE)
         self.open_image()
-        
-    def parse_pickles(self):        
+
+    def parse_pickles(self):
         infiles = os.listdir(self.save_dir)
         figure_list = []
         d = {}
@@ -309,6 +311,7 @@ class QuestionWidget(QtWidgets.QWidget):
                 pass
 
         df = pd.DataFrame.from_dict(d, orient = 'index', columns = col_names)
+        df.index.name = 'figure_id'
         df.to_csv(os.path.join(self.save_dir, 'questionnaire_results.csv'))
 
         # open next image after saving the previous image
