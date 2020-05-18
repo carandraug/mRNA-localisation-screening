@@ -8,212 +8,65 @@
 #     http://intermine.readthedocs.org/en/latest/web-services/
 #
 # --USAGE--
-# python runFlymineQueries_zegami.py -outname zegami.tsv -infile zegami.csv -query_dir testQueries -dataset_dir Zegami_datasets
+# 1) Automatically executed afer questionnaire.py is completed.
+# 2) Standalone
+#   > python buildZegamiDatabase.py
 #
-# TODO
-# -write code for the following:
-#   -axonseq data
-#   -adding FISH annotations (requires MK's code)
-#
-# -move all Omero.Figures into a common dataset
-# -fix Omero.Figure filenames
 
 from intermine.webservice import Service
 service = Service("http://www.flymine.org/flymine/service")
-
-import sys
-import argparse
-import unicodedata
-import re
+import config
+import importlib
 import pandas as pd
 import os
+import sys
 
-#link to location of the file mapping Bangalor or CPTI # to FBg #
+# link to location of the file mapping Bangalor or CPTI # to FBg #
 flyline_file='Flyline_FBg_whole_genome.csv'
 
-class Query():
-    '''Parse parameter file for Flymine query'''
-    def __init__(self, paramfile):
-        self.constraints={}
-        self.filters={}
-        f=open(paramfile, 'r')
-        for line in f:
-            fields=line.strip('\n').split('\t')
-            if fields[0]=='QUERY_NAME':
-                self.qname=fields[-1]
-            elif fields[0]=='QUERY_TYPE':
-                self.qtype= fields[-1]
-            elif fields[0].startswith('CONSTRAINT'):
-                thisconstraint=fields[0].rsplit('CONSTRAINT')[-1]
-                if '=' in fields[-1]: #this is a rule, need to separate individual components
-                    fs=re.split(r'[<>=]', fields[-1])
-                    splitter=fields[-1].strip(fs[0]).strip(fs[-1])
-                    self.constraints[fs[0]]=[fs[0], splitter, fs[-1]]
+# add OMERO.Figure link and image ID to Zegami.tsv
+zegami_df = pd.read_csv('figure_id_reference.csv')
+zegami_df["OMEROFigurelink"]=str('https://omero1.bioch.ox.ac.uk/figure/file/')+zegami_df["figure_id"].astype(str)
+zegami_df["image"]=zegami_df["figure_id"].astype(str)+str('.png')
 
-                else:
-                    self.constraints[thisconstraint]=[i for i in fields[1:]]
-            elif fields[0].startswith('FILTER'): #this is where you can specify which values in a comma-separated list will be output, for example if you only want to report specific phenotypes in a screen
-                thisfilter=fields[0].rsplit('FILTER')[-1]
-                if '=' in fields[-1]: #this is a rule, need to separate individual components
-                    fs= fields[-1].split('=')
-                    self.filters[fs[0]]=fs[1].split(',')
-                else:
-                    self.filters[thisfilter]=[i for i in fields[1:]]
-            #I don't remember the distinction between between the filter rule with '=' and the filter rule just with spaces separating
-            elif fields[0]=='WRITE':
-                self.towrite=fields[-1]
-        f.close()
+# add whole genome of Flybase_ID to zegami.tsv
+right = pd.read_csv('Flyline_FBg_whole_genome.csv')
+zegami_df = pd.merge(zegami_df, right, how='outer', on=['Collection'])
 
-def run_query(query, query_data):
-    '''Run Flymine query, based on the Python API examples'''
+# add questionnaire results to zegami.tsv
+intDatasets = [os.path.join(root, name)
+    for root, dirs, files in os.walk('answers')
+    for name in files
+    if name.endswith(".csv")]
+intDatasets.append('answers/questionnaire_results.csv')
 
-    thisquery= service.new_query(query.qtype)
-    for i in query.constraints:
-        thisquery.add_constraint(*query.constraints[i])
-    thisquery.add_view(query.towrite) #need to use add_view for those values to be accessible
+for x in intDatasets:
+    print ('adding', x, 'to zegami.tsv file')
+    right = pd.read_csv(x)
+    zegami_df=pd.merge(zegami_df, right, how='left', on=['figure_id'])
 
-    if query.filters!={}:
-        v = list(query.filters.values())
-        thesefilters=set(v[0]) #empty set if no filters defined, for now assume only one filter on the towrite column name
-    else:
-        thesefilters=set()
+    #get rid of extraneous data and notes
+    for x in list(zegami_df.columns):
+        try:
+            if 'Unnamed' in x or 'Comments' in x:
+                zegami_df = zegami_df.drop([x], axis = 1)
+        except:
+            pass
 
-    #update results dictionary with data from queries
-    for row in thisquery.rows():
-        if row['primaryIdentifier'] in query_data:#genes included in the screen:
-            try:
-                #convert all to string data type
-                data= row[query.towrite]
-                #some types of data need conversion from unicode
-                if type(data)!='unicode':
-                    valstring= str(data)
-                else:
-                    valstring=unicodedata.normalize('NFKD', data).encode('ascii', 'ignore')
-                vals= set(valstring.split(', '))
+# add other datasets to zegami.tsv
+extDatasets = [os.path.join('datasets/externalDatasets', x) for x in os.listdir('datasets/externalDatasets') if x.endswith('.csv') if not x.startswith('.')]
 
-                #apply filters to query output if needed
-                #add query data to any previous query data obtained for gene (each gene can occupy >1 row in query results for any given query)
-                if thesefilters!=set([]):
-                    query_data[row['primaryIdentifier']]=query_data[row['primaryIdentifier']].union(vals.intersection(thesefilters))
+for x in extDatasets:
+    print ('adding', x, 'to Zegami.tsv file')
+    #left = zegami_df
+    right = pd.read_csv(x)
+    zegami_df = pd.merge(zegami_df, right, how='left', on=['Flybase_ID'])
 
-                else:
-                    query_data[row['primaryIdentifier']]=query_data[row['primaryIdentifier']].union(vals)
+# add intermine queries
+queries = [os.path.join('datasets/testQueries', q) for q in os.listdir('datasets/testQueries') if q.endswith('.py')]
 
-            except KeyError:
-                continue
+for q in queries:
+    exec(open(q).read(), globals(), locals())
+    zegami_df = pd.merge(zegami_df, config.query_df, how='left', on=['Flybase_ID'])
 
-    return query_data
-
-def main(argList):
-
-    parser= argparse.ArgumentParser()
-    parser.add_argument('-outname', help='outname for final spreadsheet')
-    parser.add_argument('-infile', help='input tsv file to update with new fields, e.g. zegami.tsv')
-    parser.add_argument('-query_dir', help='input directory containing query files')
-    parser.add_argument('-dataset_dir', help='input directory containing other datasets')
-
-    args= parser.parse_args(args=argList)
-
-    #add OMERO.Figure link and image ID to Zegami.tsv
-    zegami_df=pd.read_csv(args.infile)
-
-    zegami_df["OMEROFigurelink"]=str('https://omero1.bioch.ox.ac.uk/figure/file/')+zegami_df["figure_id"].astype(str)
-    zegami_df["image"]=zegami_df["figure_id"].astype(str)+str('.png')
-
-
-    #add whole genome of Flybase_ID to Zegami.tsv
-    #left = pd.read_csv(args.infile)
-    right = pd.read_csv(flyline_file)
-    zegami_df = pd.merge(zegami_df, right, how='outer', on=['Collection'])
-    #zegami_df= zegami_df.drop(columns=['Gene_x'])
-    zegami_df= zegami_df.rename(index=str, columns={"Gene_y": "Gene"})
-
-    #add other datasets to Zegami.tsv
-    datasets = [os.path.join(args.dataset_dir, x) for x in os.listdir(args.dataset_dir) if x.endswith('.csv') if not x.startswith('.')]
-
-    for x in datasets:
-        print ('adding', x, 'to Zegami.tsv file')
-        left = zegami_df
-        right = pd.read_csv(x)
-        zegami_df=pd.merge(left, right, how='left', on=['Flybase_ID'])
-
-    #run queries
-    queries=[os.path.join(args.query_dir, q) for q in os.listdir(args.query_dir) if q.endswith('.txt')]
-
-    for q in queries:
-        print ('running Intermine query for', q)
-        #parse file to get information to run query
-        thisquery= Query(q)
-        #store data from queries
-        query_data={k:set() for k in zegami_df['Flybase_ID'].tolist()}
-        query_data= run_query(thisquery, query_data)
-        #convert data to comma-separated list for zegami
-        for k in query_data:
-            query_data[k]=','.join(query_data[k])
-
-        zegami_df[thisquery.qname]=zegami_df['Flybase_ID'].map(query_data)
-
-    zegami_df.to_csv('%s' % args.outname, sep='\t', index=False)
-
-def buildZegamiDatabase():
-    #add OMERO.Figure link and image ID to Zegami.tsv
-    zegami_df = pd.read_csv('figure_id_reference.csv')
-    zegami_df["OMEROFigurelink"]=str('https://omero1.bioch.ox.ac.uk/figure/file/')+zegami_df["figure_id"].astype(str)
-    zegami_df["image"]=zegami_df["figure_id"].astype(str)+str('.png')
-
-    #add whole genome of Flybase_ID to zegami.tsv
-    right = pd.read_csv('Flyline_FBg_whole_genome.csv')
-    zegami_df = pd.merge(zegami_df, right, how='outer', on=['Collection'])
-
-    #add questionnaire results to zegami.tsv
-    intDatasets = [os.path.join(root, name)
-        for root, dirs, files in os.walk('answers')
-        for name in files
-        if name.endswith(".csv")]
-    intDatasets.append('answers/questionnaire_results.csv')
-
-    for x in intDatasets:
-        print ('adding', x, 'to zegami.tsv file')
-        right = pd.read_csv(x)
-        zegami_df=pd.merge(zegami_df, right, how='left', on=['figure_id'])
-
-        #get rid of extraneous data and notes
-        for x in list(zegami_df.columns):
-            try:
-                if 'Unnamed' in x or 'Comments' in x:
-                    zegami_df = zegami_df.drop([x], axis = 1)
-            except:
-                pass
-
-    #add other datasets to zegami.tsv
-    extDatasets = [os.path.join('datasets/externalDatasets', x) for x in os.listdir('datasets/externalDatasets') if x.endswith('.csv') if not x.startswith('.')]
-
-    for x in extDatasets:
-        print ('adding', x, 'to Zegami.tsv file')
-        left = zegami_df
-        right = pd.read_csv(x)
-        zegami_df = pd.merge(left, right, how='left', on=['Flybase_ID'])
-
-        #run queries
-        queries=[os.path.join('datasets/testQueries', q) for q in os.listdir('datasets/testQueries') if q.endswith('.txt')]
-
-    for q in queries:
-        print ('running Intermine query for', q)
-        #parse file to get information to run query
-        thisquery= Query(q)
-        #store data from queries
-        query_data={k:set() for k in zegami_df['Flybase_ID'].tolist()}
-        query_data= run_query(thisquery, query_data)
-        #convert data to comma-separated list for zegami
-        for k in query_data:
-            query_data[k]=','.join(query_data[k])
-
-        zegami_df[thisquery.qname]=zegami_df['Flybase_ID'].map(query_data)
-
-    zegami_df.to_csv('%s' % 'zegami.tsv', sep='\t', index=False)
-
-if __name__=='__main__':
-    main(sys.argv[1:])
-
-if __name__=='__buildZegamiDatabase__':
-    buildZegamiDatabase()
+zegami_df.to_csv('zegami.tsv', sep='\t', index=False)

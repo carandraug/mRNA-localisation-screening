@@ -33,7 +33,7 @@
 ##   string then the answer is a text box; if it is a tuple of strings
 ##   then it is a group of radio buttons.
 
-import buildZegamiDatabase
+
 import argparse
 import collections.abc
 import os
@@ -46,8 +46,6 @@ import pandas as pd
 from PIL import Image
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QMessageBox, QFileDialog
-
-
 
 def read_questions(filepath: str) -> typing.Sequence[typing.Tuple]:
     contents = {}
@@ -268,7 +266,8 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog = QtWidgets.QErrorMessage(parent=self)
             error_dialog.setModal(True)
             error_dialog.showMessage("This is the end. Building database.")
-            buildZegamiDatabase.buildZegamiDatabase()
+            #exec(open('buildZegamiDatabase.py').read(), globals(), locals())
+            import buildZegamiDatabase #I know it is bad practice but the line above does not find variables properly
             error_dialog.exec_()
             QtWidgets.qApp.quit()
 
