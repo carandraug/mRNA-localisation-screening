@@ -276,7 +276,7 @@ class QuestionWidget(QtWidgets.QWidget):
             error_dialog.setModal(True)
             error_dialog.showMessage("This is the end. Building database.")
             #exec(open('buildZegamiDatabase.py').read(), globals(), locals())
-            import buildZegamiDatabase #I know it is bad practice but the line above does not find variables properly
+            import buildZegamiDatabase #bad practice, but the line above does not find variables properly
             error_dialog.exec_()
             QtWidgets.qApp.quit()
 

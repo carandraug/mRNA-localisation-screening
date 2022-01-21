@@ -17,10 +17,12 @@
 
 #QUESTIONS = [('Is RNA in test neuropil?', ('no', 'yes')), ('Is protein in neuropil?', ('no', 'yes')), ('Comments', '')]
 QUESTIONS = [
-           RadioQuestion('Level of expression',
-                         ('none', 'low', 'high')),
-           TextQuestion('What is the problem on this image?',
-                        'This is the initial answer text'),
-           CheckQuestion('How is the distribution?',
-                         ('Punctate', 'Diffuse', 'Nuclear')),
+           RadioQuestion('Protein localized in glia?',
+                         ('no', 'yes')), 
+	   RadioQuestion('RNA in localized in glia',('no', 'yes')),
+	   #CheckQuestion('How is the protein distributed?', ('Punctate', 'Diffuse', 'Nuclear')),
+           TextQuestion('Comments on the image?',
+                       ('This is the initial answer text'))
+           #CheckQuestion('How is the distribution?',
+           #              ('Punctate', 'Diffuse', 'Nuclear')),
        ]
