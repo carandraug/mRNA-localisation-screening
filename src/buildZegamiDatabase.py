@@ -63,9 +63,10 @@ for x in extDatasets:
     zegami_df = pd.merge(zegami_df, right, how='left', on=['Flybase_ID'])
 
 # add intermine queries
-queries = [os.path.join('datasets/testQueries', q) for q in os.listdir('datasets/testQueries') if q.endswith('.py')]
+queries = [os.path.join('datasets/testQueries', q) for q in os.listdir('datasets/testQueries') if q.endswith('.txt')]
 
 for q in queries:
+    print('performing query:', q)
     exec(open(q).read(), globals(), locals())
     zegami_df = pd.merge(zegami_df, config.query_df, how='left', on=['Flybase_ID'])
 
